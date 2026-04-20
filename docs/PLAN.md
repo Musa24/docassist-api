@@ -7,8 +7,8 @@ each ticket before opening its PR. Newest first.
 
 ## DOC-1 — Initialize backend repo and project scaffold
 
-**Status:** Complete — ready for PR
-**Branch:** feature/DOC-001-project-scaffold
+**Status:** Done — merged directly to `main` (bootstrap commit; no PR)
+**Branch:** feature/DOC-001-project-scaffold → promoted to `main`
 **Jira:** https://udemycourse2495.atlassian.net/browse/DOC-1
 
 ### What we did
@@ -42,9 +42,14 @@ each ticket before opening its PR. Newest first.
 - `uv run pytest` → exit 5 (no tests collected — expected at scaffold stage)
 
 ### Next
-- Push branch to origin
-- Open PR against main
-- Move DOC-1 to "In Review"
+- None for DOC-1. From DOC-2 onwards, normal feature-branch → PR → main workflow applies.
+
+### Note on skipped PR
+`main` did not exist when the feature branch was first pushed (GitHub auto-set the feature
+branch as the default because the remote repo was empty). For a bootstrap commit, industry
+practice is to land the initial scaffold directly on `main` rather than open an artificial PR
+against an empty base. The feature branch was therefore renamed/promoted to `main` and set as
+the default; the old feature branch was deleted from the remote.
 
 ---
 
