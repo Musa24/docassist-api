@@ -1,0 +1,38 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments (uv creates .venv by default)
+.venv/
+venv/
+env/
+
+# Environment files — never commit secrets
+.env
+.env.*
+!.env.example
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Packaging artifacts
+*.egg-info/
+build/
+dist/
+
+# Local databases (not shared between environments)
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploaded PDFs — keep the folder via .gitkeep, ignore everything else
+uploads/*
+!uploads/.gitkeep
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
