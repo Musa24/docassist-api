@@ -5,10 +5,67 @@ each ticket before opening its PR. Newest first.
 
 ---
 
-## DOC-2 — Database connection and Document model
+## DOC-3 — PDF upload and text extraction endpoint
 
 **Status:** In progress — PR open against `main`
-**Branch:** feature/DOC-002-database-model
+**Branch:** feature/DOC-003-pdf-upload
+**Jira:** https://udemycourse2495.atlassian.net/browse/DOC-3
+
+### What we did
+- [x] Step 1 — restore `.gitignore`, create feature branch `feature/DOC-003-pdf-upload` from `main`
+- [x] Step 2 — `app/services/pdf_service.py` (`extract_text` + `PdfExtractionError`, strict `filetype="pdf"` for defense-in-depth) + export from `app/services/__init__.py`
+- [x] Step 3 — `app/routes/documents.py` (`POST /documents/upload`: validate PDF, stream-save to `uploads/<uuid>.pdf`, extract text, persist Document, return 201) + export from `app/routes/__init__.py`
+- [x] Step 4 — wire `documents_router` into `app/main.py` via `include_router`
+- [x] Step 5 — end-to-end test (real PDF → 201, .txt → 400, lying-extension PDF → 422 with file cleanup)
+- [x] Step 6 — update PLAN.md, commit, push, open PR, transition Jira to In Progress
+
+(Unchecked items = attempted but not finished. None this ticket.)
+
+### Acceptance criteria (from ticket)
+- [x] `app/services/pdf_service.py` exposes a function that takes a file path, opens with PyMuPDF (fitz), and returns extracted text + page count
+- [x] Service handles corrupt/invalid PDFs gracefully (raises `PdfExtractionError`, doesn't crash the server)
+- [x] `app/routes/documents.py` contains `POST /documents/upload`
+- [x] Endpoint accepts a PDF via `UploadFile`
+- [x] Validates the file is a PDF (content type **or** extension)
+- [x] Saves the file to `uploads/`
+- [x] Calls the PDF service to extract text
+- [x] Creates a Document record with `status="completed"`
+- [x] Returns `DocumentResponse` with status 201
+- [x] Rejects non-PDF files with 400
+- [x] `app/main.py` includes the documents router
+- [x] Endpoint works via `/docs` (verified via direct HTTP test — same code path)
+- [x] Branch: `feature/DOC-003-pdf-upload`
+- [x] Commit message references ticket: `DOC-003: ...`
+
+### Deviations from ticket
+- On-disk filename is a UUID (`uploads/<uuid>.pdf`), not the original filename. Original is preserved in `Document.filename`. Reason: collision safety + path-traversal safety + deterministic tests.
+- Service is strict-PDF: `fitz.open(path, filetype="pdf")` rather than `fitz.open(path)`. PyMuPDF can auto-detect non-PDF formats (text, EPUB, …) and our function is meant for PDFs only — defense in depth alongside the route's content-type check.
+- Validation is OR (content-type **or** `.pdf` extension) rather than AND. Reason: `curl -F file=@thing.pdf` typically sends `application/octet-stream`; AND-checking would break that path. Magic-byte sniffing left for a future hardening ticket.
+- Corrupt/non-PDF body with `.pdf` extension → HTTP 422 (Unprocessable Entity), not 400. The request is syntactically valid but the content can't be processed — textbook 422 vs 400.
+- On parse failure: the half-saved file is deleted and **no `status="failed"` Document row is created**. The `failed` status is more appropriate for async/background processing (DOC-4+); a synchronous upload-and-extract endpoint returns the error to the caller instead of persisting a phantom row.
+- File-size limit not enforced. Ticket doesn't specify one. Will be added in a later hardening ticket; YAGNI for DOC-3.
+
+### Verification
+- `uv run python -c "from app.services import extract_text, PdfExtractionError"` → imports ok
+- Round-trip on a fitz-generated PDF → returns `(text, 1)` with expected text
+- Negative cases: `.txt` content, random binary, missing file → all raise `PdfExtractionError`
+- Server boots: `uv run uvicorn app.main:app --port 8765`
+- `POST /documents/upload` with real 2-page PDF → 201 + `DocumentResponse` (id, filename preserved, file_size, page_count=2, text_content with both pages, status="completed")
+- `POST /documents/upload` with `.txt` (text/plain) → 400 `{"detail":"File must be a PDF."}`
+- `POST /documents/upload` with txt body but `.pdf` extension + `application/pdf` content-type → 422; saved file cleaned up (no orphan in `uploads/`)
+- DB: exactly one row in `documents` after the three calls (only the successful one)
+- Disk: exactly one file in `uploads/` (only the successful UUID PDF)
+
+### Next
+- Await user review of the PR.
+- On approval, merge with `gh pr merge --squash`, sync local `main`, delete feature branches, transition DOC-3 → Done.
+
+---
+
+## DOC-2 — Database connection and Document model
+
+**Status:** Done — merged to `main` via PR #1 (squash, commit `2cfa085`)
+**Branch:** feature/DOC-002-database-model (deleted post-merge)
 **Jira:** https://udemycourse2495.atlassian.net/browse/DOC-2
 
 ### What we did
@@ -50,8 +107,7 @@ each ticket before opening its PR. Newest first.
 - `git check-ignore -v docassist.db` → matched by `*.db` rule (ignored as required)
 
 ### Next
-- Await user review of the PR.
-- On approval, merge with `gh pr merge --squash`, sync local `main`, delete feature branches, transition DOC-2 → Done.
+- None for DOC-2. PR #1 merged manually by the user; local `main` synced; feature branches (local + remote) deleted; Jira DOC-2 transitioned to Done.
 
 ### Known residual diagnostic
 - Pylance shows a "Document is not accessed" hint on the metadata-side-effect import in `app/main.py`. The import is load-bearing (registers `Document` with `Base.metadata` so `create_all` sees it). Ruff/flake8 suppression `# noqa: F401` is present; Pylance's hint isn't tied to a named rule and ignores the suppression. Cosmetic — left as-is for this ticket; a later ticket that restructures startup (e.g. introducing `lifespan` or Alembic) will naturally dissolve it.
